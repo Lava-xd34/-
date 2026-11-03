@@ -416,6 +416,8 @@ function toClock(t){if(!t.time){alert('اول ساعت بگذار');return}const
 $('#sClock').onchange=e=>{S.set.clock=e.target.checked;save()};
 const _rs=renderSet;renderSet=function(){_rs();$('#sClock').checked=S.set.clock!==false};
 render();
+
+try{if(navigator.storage&&navigator.storage.persist){navigator.storage.persist();}}catch(e){}
 </script>
 </body>
 </html>
