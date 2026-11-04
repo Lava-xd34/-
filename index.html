@@ -262,7 +262,7 @@ const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
 const QS={1:{n:'فوری و مهم',h:'همین امروز انجام بده',c:'var(--q1)',hex:'#ef4444'},2:{n:'مهم، غیرفوری',h:'زمانش را مشخص کن',c:'var(--q2)',hex:'#2563eb'},3:{n:'فوری، غیرمهم',h:'به تعویق بینداز یا کوتاهش کن',c:'var(--q3)',hex:'#f59e0b'},4:{n:'نه فوری نه مهم',h:'حذف یا فقط اگر وقت ماند',c:'var(--q4)',hex:'#9ca3af'}};
 const KEY='matrix_v1';
 let S=JSON.parse(localStorage.getItem(KEY)||'null')||{tasks:[],recur:[],set:{sound:true,vib:true,lead:0}};
-const save=()=>localStorage.setItem(KEY,JSON.stringify(S));
+const save=()=>{localStorage.setItem(KEY,JSON.stringify(S));try{const p=document.getElementById('pg-stats');if(p&&p.classList.contains('on'))stats()}catch(e){}};
 const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
 const p2=n=>String(n).padStart(2,'0');
 const iso=d=>`${d.getFullYear()}-${p2(d.getMonth()+1)}-${p2(d.getDate())}`;
@@ -353,7 +353,7 @@ $('#aDone').onclick=()=>{stopSound();if(alarmTask){alarmTask.done=true;alarmTask
 $('#aSnooze').onclick=()=>{stopSound();if(alarmTask){S.snooze=S.snooze||[];S.snooze.push({id:alarmTask.id,at:Date.now()+600000});save()}$('#alarm').classList.remove('on');schedule()};
 $('#aClose').onclick=()=>{stopSound();$('#alarm').classList.remove('on')};
 $('#testAlarm').onclick=()=>{askPerm();fire({id:'test',t:'تست هشدار',q:1,time:''})};
-document.addEventListener('visibilitychange',()=>{if(!document.hidden){if(cur<todayIso()&&cur===addDays(todayIso(),-1))cur=todayIso();render()}});
+document.addEventListener('visibilitychange',()=>{if(!document.hidden){if(cur<todayIso()&&cur===addDays(todayIso(),-1))cur=todayIso();render();if($('#pg-stats').classList.contains('on'))stats()}});
 setInterval(()=>{const d=todayIso();if(d!==window._lastDay){window._lastDay=d;render()}},60000);window._lastDay=todayIso();
 
 /* ICS */
@@ -391,14 +391,15 @@ function span(from,n){const ds=[];for(let i=0;i<n;i++)ds.push(addDays(from,i));r
 function agg(days){let tot=0,dn=0,act=0;days.forEach(d=>{const s=dayStat(d);tot+=s.total;dn+=s.done;if(s.done)act++});return {tot,dn,act,pct:tot?Math.round(dn*100/tot):0}}
 function chg(a,b){if(!b)return a?null:0;return Math.round((a-b)*100/b)}
 function cmpCard(el,title,sub,A,B,la,lb){const c=chg(A.dn,B.dn);let cls,ic,v,t;
-  if(!A.dn&&!B.dn){cls='eq';ic='•';v='هنوز داده‌ای نیست';t='کارها را تیک بزن تا مقایسه ساخته شود'}
+  if(!A.dn&&!B.dn&&!A.tot&&!B.tot){cls='eq';ic='•';v='هنوز کاری ثبت نشده';t='کار اضافه کن و تیک بزن تا مقایسه ساخته شود'}
+  else if(!A.dn&&!B.dn){cls='eq';ic='☐';v='هنوز کاری تیک نخورده';t=`${fa(A.tot)} کار در لیست؛ با تیک «انجام شد» مقایسه ساخته می‌شود`}
   else if(c===null){cls='nw';ic='🚀';v='شروع تازه';t=`${fa(A.dn)} کار انجام دادی؛ دورهٔ قبل صفر بود`}
   else if(c>=10){cls='up';ic='▲';v='فعال‌تر از قبل';t=`${fa(c)}٪ کار بیشتر انجام دادی`}
   else if(c<=-10){cls='dn';ic='▼';v='کم‌کارتر از قبل';t=`${fa(-c)}٪ کار کمتر انجام دادی`}
   else{cls='eq';ic='＝';v='تقریباً مثل قبل';t='تغییر کمتر از ۱۰٪'}
   const row=(n,a,b,u)=>{const d=a-b,k=d>0?'up2':d<0?'dn2':'eq2';return `<div class="rw"><span>${n}</span><span><b>${fa(a)}${u}</b></span><span>${fa(b)}${u}</span><span class="${k}">${d>0?'+':''}${fa(d)}${u}</span></div>`};
   el.innerHTML=`<div class="hd"><b>${title}</b><small>${sub}</small></div><div class="vd ${cls}"><span class="ic">${ic}</span><div><b>${v}</b><small>${t}</small></div></div>
-  <div class="rw h"><span></span><span>${la}</span><span>${lb}</span><span>تغییر</span></div>${row('کار انجام‌شده',A.dn,B.dn,'')}${row('درصد انجام',A.pct,B.pct,'٪')}${row('روز فعال',A.act,B.act,'')}`}
+  <div class="rw h"><span></span><span>${la}</span><span>${lb}</span><span>تغییر</span></div>${row('کار در لیست',A.tot,B.tot,'')}${row('کار انجام‌شده',A.dn,B.dn,'')}${row('درصد انجام',A.pct,B.pct,'٪')}${row('روز فعال',A.act,B.act,'')}`}
 function stats(){const today=todayIso();
   cmpCard($('#cmpD'),'امروز در برابر دیروز','لیست امروز در برابر لیست دیروز',agg([today]),agg([addDays(today,-1)]),'امروز','دیروز');
   const ws=weekStart(today),nW=Math.round((fromIso(today)-fromIso(ws))/864e5)+1;
