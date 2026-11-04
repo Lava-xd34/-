@@ -11,7 +11,7 @@
 :root{--bg:#f3f4f6;--card:#fff;--ink:#111827;--muted:#6b7280;--line:#e5e7eb;--q1:#ef4444;--q2:#2563eb;--q3:#f59e0b;--q4:#9ca3af;--ok:#16a34a}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;height:100%}
-body{font-family:Tahoma,"Vazirmatn","Segoe UI",sans-serif;background:var(--bg);color:var(--ink);font-size:15px;padding-bottom:70px}
+body{font-family:Tahoma,"Vazirmatn","Segoe UI",sans-serif;background:var(--bg);color:var(--ink);font-size:15px;padding-bottom:calc(120px + env(safe-area-inset-bottom))}
 header{position:sticky;top:0;z-index:5;background:#111827;color:#fff;padding:10px 12px calc(10px) ;display:flex;align-items:center;gap:8px}
 header .d{flex:1;text-align:center}
 header .d b{display:block;font-size:16px}
@@ -116,10 +116,12 @@ canvas{width:100%;display:block}
 </section>
 
 <section class="page" id="pg-stats">
+  <div class="cmp" id="cmpD"></div>
   <div class="cmp" id="cmpW"></div>
   <div class="cmp" id="cmpM"></div>
+  <div class="cmp" id="cmpQ"></div>
   <div class="card"><h4>روند فعالیت</h4>
-    <div class="seg" id="trendSeg"><button data-t="w" class="on">۸ هفتهٔ اخیر</button><button data-t="m">۶ ماه اخیر</button></div>
+    <div class="seg" id="trendSeg"><button data-t="w" class="on">۸ هفتهٔ اخیر</button><button data-t="m">۶ ماه اخیر</button><button data-t="q">فصل‌ها (۳ ماهه)</button></div>
     <canvas id="cTrend" data-h="190"></canvas>
     <p class="muted" id="trendNote" style="margin:6px 0 0"></p>
   </div>
@@ -379,8 +381,10 @@ let trend='w';
 function daysBack(n){const a=[];for(let i=n-1;i>=0;i--)a.push(addDays(todayIso(),-i));return a}
 function dayStat(d){const ts=dayTasks(d),done=ts.filter(t=>t.done).length;return {d,total:ts.length,done,pct:ts.length?Math.round(done*100/ts.length):null}}
 function setupCanvas(c){const r=window.devicePixelRatio||1,w=c.clientWidth||c.parentNode.clientWidth,h=+(c.dataset.h||c.getAttribute('height')||200);c.width=Math.round(w*r);c.height=Math.round(h*r);c.style.width='100%';c.style.height=h+'px';const x=c.getContext('2d');x.setTransform(r,0,0,r,0,0);x.font='11px Tahoma';return [x,w,h]}
-const jm=d=>{const p=new Intl.DateTimeFormat('en-u-ca-persian',{year:'numeric',month:'numeric',day:'numeric'}).formatToParts(fromIso(d));const g=t=>+p.find(x=>x.type===t).value;return {y:g('year'),m:g('month'),d:g('day')}};
-const jMonthName=d=>fromIso(d).toLocaleDateString('fa-IR-u-ca-persian',{month:'long'});
+function g2j(gy,gm,gd){const g=[0,31,59,90,120,151,181,212,243,273,304,334];let jy=gy<=1600?0:979;gy-=gy<=1600?621:1600;const gy2=gm>2?gy+1:gy;let days=365*gy+Math.floor((gy2+3)/4)-Math.floor((gy2+99)/100)+Math.floor((gy2+399)/400)-80+gd+g[gm-1];jy+=33*Math.floor(days/12053);days%=12053;jy+=4*Math.floor(days/1461);days%=1461;if(days>365){jy+=Math.floor((days-1)/365);days=(days-1)%365}const jm=days<186?1+Math.floor(days/31):7+Math.floor((days-186)/30);const jd=1+(days<186?days%31:(days-186)%30);return {y:jy,m:jm,d:jd}}
+const jm=d=>{const [y,m,dd]=d.split('-').map(Number);return g2j(y,m,dd)};
+const JMN=['فروردین','اردیبهشت','خرداد','تیر','مرداد','شهریور','مهر','آبان','آذر','دی','بهمن','اسفند'];
+const jMonthName=d=>JMN[jm(d).m-1];
 const weekStart=d=>{const w=fromIso(d).getDay();return addDays(d,-((w+1)%7))};
 const monthStart=d=>addDays(d,-(jm(d).d-1));
 function span(from,n){const ds=[];for(let i=0;i<n;i++)ds.push(addDays(from,i));return ds}
@@ -396,13 +400,19 @@ function cmpCard(el,title,sub,A,B,la,lb){const c=chg(A.dn,B.dn);let cls,ic,v,t;
   el.innerHTML=`<div class="hd"><b>${title}</b><small>${sub}</small></div><div class="vd ${cls}"><span class="ic">${ic}</span><div><b>${v}</b><small>${t}</small></div></div>
   <div class="rw h"><span></span><span>${la}</span><span>${lb}</span><span>تغییر</span></div>${row('کار انجام‌شده',A.dn,B.dn,'')}${row('درصد انجام',A.pct,B.pct,'٪')}${row('روز فعال',A.act,B.act,'')}`}
 function stats(){const today=todayIso();
+  cmpCard($('#cmpD'),'امروز در برابر دیروز','لیست امروز در برابر لیست دیروز',agg([today]),agg([addDays(today,-1)]),'امروز','دیروز');
   const ws=weekStart(today),nW=Math.round((fromIso(today)-fromIso(ws))/864e5)+1;
   cmpCard($('#cmpW'),'این هفته در برابر هفتهٔ قبل',nW<7?`${fa(nW)} روز اول هر دو هفته`:'هفتهٔ کامل',agg(span(ws,nW)),agg(span(addDays(ws,-7),nW)),'این هفته','هفتهٔ قبل');
   const ms=monthStart(today),dIn=jm(today).d,pEnd=addDays(ms,-1),pLen=jm(pEnd).d,pStart=addDays(pEnd,-(pLen-1)),n=Math.min(dIn,pLen);
   cmpCard($('#cmpM'),`${jMonthName(today)} در برابر ${jMonthName(pEnd)}`,`${fa(n)} روز اول هر دو ماه`,agg(span(ms,dIn)),agg(span(pStart,n)),'این ماه','ماه قبل');
+  const qS=d=>{let m=monthStart(d);const k=(jm(m).m-1)%3;for(let i=0;i<k;i++)m=monthStart(addDays(m,-1));return m};
+  const QN=['بهار','تابستان','پاییز','زمستان'];
+  const q0=qS(today),nQ=Math.round((fromIso(today)-fromIso(q0))/864e5)+1,pq0=qS(addDays(q0,-1));
+  cmpCard($('#cmpQ'),`${QN[Math.floor((jm(q0).m-1)/3)]} در برابر ${QN[Math.floor((jm(pq0).m-1)/3)]} (۳ ماه)`,`${fa(nQ)} روز اول هر دو فصل`,agg(span(q0,nQ)),agg(span(pq0,nQ)),'این ۳ ماه','۳ ماه قبل');
   // trend
   let bars=[];
   if(trend==='w'){for(let k=7;k>=0;k--){const s0=addDays(ws,-7*k),len=k===0?nW:7,a=agg(span(s0,len));bars.push({l:k===0?'این هفته':jalShort(s0),v:a.dn,cur:k===0})}}
+  else if(trend==='q'){let s0=q0;const arr=[];for(let k=0;k<4;k++){const e=k===0?today:addDays(qS(addDays(nextM(nextM(nextM(s0))),0)),-1);const len=Math.round((fromIso(k===0?today:addDays(nextM(nextM(nextM(s0))),-1))-fromIso(s0))/864e5)+1;arr.unshift({l:QN[Math.floor((jm(s0).m-1)/3)],v:agg(span(s0,len)).dn,cur:k===0});s0=qS(addDays(s0,-1))}bars=arr}
   else{let m0=ms;const arr=[];for(let k=0;k<6;k++){const len=k===0?dIn:jm(addDays(nextM(m0),-1)).d;arr.unshift({s:m0,len,cur:k===0});m0=monthStart(addDays(m0,-1))}
     bars=arr.map(o=>({l:jMonthName(o.s),v:agg(span(o.s,o.len)).dn,cur:o.cur}))}
   let [x,w,h]=setupCanvas($('#cTrend'));const padB=26,padT=18,mx=Math.max(1,...bars.map(b=>b.v)),bw=w/bars.length;
@@ -413,7 +423,7 @@ function stats(){const today=todayIso();
     x.fillStyle='#111827';x.textAlign='center';x.font='bold 11px Tahoma';x.fillText(fa(b.v),X+W/2,Y-5);
     x.fillStyle='#6b7280';x.font='10px Tahoma';x.fillText(b.l,X+W/2,h-9)});
   const last=bars[bars.length-1],prev=bars[bars.length-2];
-  $('#trendNote').textContent=trend==='w'?'عدد هر ستون = کارهای انجام‌شده در آن هفته (شروع هفته شنبه).':'عدد هر ستون = کارهای انجام‌شده در آن ماه شمسی؛ ماه جاری تا امروز.';
+  $('#trendNote').textContent=trend==='q'?'عدد هر ستون = کارهای انجام‌شده در آن فصل (۳ ماه شمسی)؛ فصل جاری تا امروز.':trend==='w'?'عدد هر ستون = کارهای انجام‌شده در آن هفته (شروع هفته شنبه).':'عدد هر ستون = کارهای انجام‌شده در آن ماه شمسی؛ ماه جاری تا امروز.';
 }
 function nextM(m0){let d=addDays(m0,27);while(jm(d).d!==1)d=addDays(d,1);return d}
 
