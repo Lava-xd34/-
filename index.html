@@ -83,6 +83,15 @@ canvas{width:100%;display:block}
 .rec li{display:flex;gap:8px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line)}
 .rec li span{flex:1}
 .banner{background:#fef3c7;border:1px solid #fde68a;border-radius:12px;padding:10px;font-size:13px;line-height:1.8;margin-bottom:10px}
+.cmp{background:#fff;border:1px solid var(--line);border-radius:16px;padding:14px;margin-bottom:10px}
+.cmp .hd{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+.cmp .hd b{font-size:15px}.cmp .hd small{color:var(--muted);font-size:11px}
+.cmp .vd{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:12px;margin-bottom:10px}
+.cmp .vd .ic{font-size:26px;line-height:1}.cmp .vd b{display:block;font-size:17px}.cmp .vd small{font-size:12px;opacity:.85}
+.vd.up{background:#dcfce7;color:#166534}.vd.dn{background:#fee2e2;color:#991b1b}.vd.eq{background:#f3f4f6;color:#374151}.vd.nw{background:#dbeafe;color:#1e40af}
+.cmp .rw{display:grid;grid-template-columns:1.3fr 1fr 1fr .9fr;gap:4px;font-size:13px;padding:6px 0;border-top:1px solid #f1f5f9;align-items:center}
+.cmp .rw.h{color:var(--muted);font-size:11px;border-top:0;padding-top:0}
+.cmp .rw span:not(:first-child){text-align:center}.cmp .up2{color:#16a34a;font-weight:700}.cmp .dn2{color:#dc2626;font-weight:700}.cmp .eq2{color:#6b7280}
 </style>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#111827">
@@ -107,14 +116,13 @@ canvas{width:100%;display:block}
 </section>
 
 <section class="page" id="pg-stats">
-  <div class="seg" id="rangeSeg"><button data-r="7" class="on">۷ روز</button><button data-r="14">۱۴ روز</button><button data-r="30">۳۰ روز</button></div>
-  <div class="kpis">
-    <div class="kpi"><b id="kAvg">-</b><small>میانگین انجام</small></div>
-    <div class="kpi"><b id="kStreak">-</b><small>روز پیاپی ≥۷۰٪</small></div>
-    <div class="kpi"><b id="kQ2">-</b><small>سهم «مهم غیرفوری»</small></div>
+  <div class="cmp" id="cmpW"></div>
+  <div class="cmp" id="cmpM"></div>
+  <div class="card"><h4>روند فعالیت</h4>
+    <div class="seg" id="trendSeg"><button data-t="w" class="on">۸ هفتهٔ اخیر</button><button data-t="m">۶ ماه اخیر</button></div>
+    <canvas id="cTrend" data-h="190"></canvas>
+    <p class="muted" id="trendNote" style="margin:6px 0 0"></p>
   </div>
-  <div class="card"><h4>درصد انجام هر روز</h4><canvas id="cDays" height="220"></canvas></div>
-  <div class="card"><h4>کارهای انجام‌شده به تفکیک بخش</h4><canvas id="cQ" height="200"></canvas><p class="muted" id="qNote"></p></div>
   <div class="card"><h4>خروجی اکسل</h4>
     <button class="btn g full" id="xTasks">اکسل همهٔ کارها</button>
     <div style="height:8px"></div>
@@ -367,29 +375,47 @@ $('#wipe').onclick=()=>{if(confirm('همهٔ کارها و تنظیمات پاک
 
 /* stats */
 let range=7;
-$$('#rangeSeg button').forEach(b=>b.onclick=()=>{range=+b.dataset.r;$$('#rangeSeg button').forEach(x=>x.classList.toggle('on',x===b));stats()});
+let trend='w';
 function daysBack(n){const a=[];for(let i=n-1;i>=0;i--)a.push(addDays(todayIso(),-i));return a}
 function dayStat(d){const ts=dayTasks(d),done=ts.filter(t=>t.done).length;return {d,total:ts.length,done,pct:ts.length?Math.round(done*100/ts.length):null}}
-function setupCanvas(c){const r=window.devicePixelRatio||1,w=c.clientWidth,h=+c.getAttribute('height');c.width=w*r;c.height=h*r;c.style.height=h+'px';const x=c.getContext('2d');x.scale(r,r);x.font='11px Tahoma';return [x,w,h]}
-function stats(){const ds=daysBack(range).map(dayStat),withT=ds.filter(s=>s.total);
-  const avg=withT.length?Math.round(withT.reduce((a,s)=>a+s.pct,0)/withT.length):0;$('#kAvg').textContent=fa(avg)+'٪';
-  let st=0;for(let i=0;;i++){const s=dayStat(addDays(todayIso(),-i));if(i===0&&(s.pct===null||s.pct<70))continue;if(s.pct!==null&&s.pct>=70)st++;else break;if(i>400)break}$('#kStreak').textContent=fa(st);
-  const all=S.tasks.filter(t=>ds.some(s=>s.d===t.date)),dn=all.filter(t=>t.done);
-  $('#kQ2').textContent=fa(dn.length?Math.round(dn.filter(t=>t.q===2).length*100/dn.length):0)+'٪';
-  // days bar chart
-  let [x,w,h]=setupCanvas($('#cDays'));const pad=24,bw=(w-pad*2)/ds.length;
-  x.strokeStyle='#e5e7eb';x.fillStyle='#6b7280';x.textAlign='right';
-  [0,50,100].forEach(v=>{const y=h-pad-(h-pad*2)*v/100;x.beginPath();x.moveTo(pad,y);x.lineTo(w-6,y);x.stroke();x.fillText(fa(v),pad-3,y+4)});
-  x.setLineDash([4,4]);x.strokeStyle='#16a34a';const y70=h-pad-(h-pad*2)*.7;x.beginPath();x.moveTo(pad,y70);x.lineTo(w-6,y70);x.stroke();x.setLineDash([]);
-  ds.forEach((s,i)=>{const X=w-6-(i+1)*bw+bw*.15,bwi=bw*.7;if(s.pct!==null){const bh=(h-pad*2)*s.pct/100;x.fillStyle=s.pct>=70?'#16a34a':s.pct>=40?'#f59e0b':'#ef4444';x.fillRect(X,h-pad-bh,bwi,Math.max(bh,2))}else{x.fillStyle='#e5e7eb';x.fillRect(X,h-pad-2,bwi,2)}
-    x.fillStyle='#6b7280';x.textAlign='center';if(ds.length<=14||i%3===0)x.fillText(jalShort(s.d),X+bwi/2,h-8)});
-  // quadrant bars
-  [x,w,h]=setupCanvas($('#cQ'));const rows=[1,2,3,4].map(q=>({q,tot:all.filter(t=>t.q===q).length,dn:dn.filter(t=>t.q===q).length})),mx=Math.max(1,...rows.map(r=>r.tot)),rh=(h-10)/4;
-  rows.forEach((r,i)=>{const y=5+i*rh,lw=110,bwm=w-lw-40;x.fillStyle='#111827';x.textAlign='right';x.font='12px Tahoma';x.fillText(QS[r.q].n,w-2,y+rh/2+4);
-    x.fillStyle='#e5e7eb';x.fillRect(w-lw-bwm*r.tot/mx,y+rh*.25,bwm*r.tot/mx,rh*.5);x.fillStyle=QS[r.q].hex;x.fillRect(w-lw-bwm*r.dn/mx,y+rh*.25,bwm*r.dn/mx,rh*.5);
-    x.fillStyle='#374151';x.textAlign='left';x.fillText(`${fa(r.dn)}/${fa(r.tot)}`,2,y+rh/2+4)});
-  const q1=rows[0].tot,q2=rows[1].tot;$('#qNote').textContent=q1>q2*2&&q1>3?'بیشتر کارها «فوری» شده‌اند؛ یعنی کارهای مهم دیر شروع می‌شوند. یک کار «مهم غیرفوری» را صبح انجام بده.':'رنگ پررنگ = انجام‌شده، خاکستری = کل.';
+function setupCanvas(c){const r=window.devicePixelRatio||1,w=c.clientWidth||c.parentNode.clientWidth,h=+(c.dataset.h||c.getAttribute('height')||200);c.width=Math.round(w*r);c.height=Math.round(h*r);c.style.width='100%';c.style.height=h+'px';const x=c.getContext('2d');x.setTransform(r,0,0,r,0,0);x.font='11px Tahoma';return [x,w,h]}
+const jm=d=>{const p=new Intl.DateTimeFormat('en-u-ca-persian',{year:'numeric',month:'numeric',day:'numeric'}).formatToParts(fromIso(d));const g=t=>+p.find(x=>x.type===t).value;return {y:g('year'),m:g('month'),d:g('day')}};
+const jMonthName=d=>fromIso(d).toLocaleDateString('fa-IR-u-ca-persian',{month:'long'});
+const weekStart=d=>{const w=fromIso(d).getDay();return addDays(d,-((w+1)%7))};
+const monthStart=d=>addDays(d,-(jm(d).d-1));
+function span(from,n){const ds=[];for(let i=0;i<n;i++)ds.push(addDays(from,i));return ds}
+function agg(days){let tot=0,dn=0,act=0;days.forEach(d=>{const s=dayStat(d);tot+=s.total;dn+=s.done;if(s.done)act++});return {tot,dn,act,pct:tot?Math.round(dn*100/tot):0}}
+function chg(a,b){if(!b)return a?null:0;return Math.round((a-b)*100/b)}
+function cmpCard(el,title,sub,A,B,la,lb){const c=chg(A.dn,B.dn);let cls,ic,v,t;
+  if(!A.dn&&!B.dn){cls='eq';ic='•';v='هنوز داده‌ای نیست';t='کارها را تیک بزن تا مقایسه ساخته شود'}
+  else if(c===null){cls='nw';ic='🚀';v='شروع تازه';t=`${fa(A.dn)} کار انجام دادی؛ دورهٔ قبل صفر بود`}
+  else if(c>=10){cls='up';ic='▲';v='فعال‌تر از قبل';t=`${fa(c)}٪ کار بیشتر انجام دادی`}
+  else if(c<=-10){cls='dn';ic='▼';v='کم‌کارتر از قبل';t=`${fa(-c)}٪ کار کمتر انجام دادی`}
+  else{cls='eq';ic='＝';v='تقریباً مثل قبل';t='تغییر کمتر از ۱۰٪'}
+  const row=(n,a,b,u)=>{const d=a-b,k=d>0?'up2':d<0?'dn2':'eq2';return `<div class="rw"><span>${n}</span><span><b>${fa(a)}${u}</b></span><span>${fa(b)}${u}</span><span class="${k}">${d>0?'+':''}${fa(d)}${u}</span></div>`};
+  el.innerHTML=`<div class="hd"><b>${title}</b><small>${sub}</small></div><div class="vd ${cls}"><span class="ic">${ic}</span><div><b>${v}</b><small>${t}</small></div></div>
+  <div class="rw h"><span></span><span>${la}</span><span>${lb}</span><span>تغییر</span></div>${row('کار انجام‌شده',A.dn,B.dn,'')}${row('درصد انجام',A.pct,B.pct,'٪')}${row('روز فعال',A.act,B.act,'')}`}
+function stats(){const today=todayIso();
+  const ws=weekStart(today),nW=Math.round((fromIso(today)-fromIso(ws))/864e5)+1;
+  cmpCard($('#cmpW'),'این هفته در برابر هفتهٔ قبل',nW<7?`${fa(nW)} روز اول هر دو هفته`:'هفتهٔ کامل',agg(span(ws,nW)),agg(span(addDays(ws,-7),nW)),'این هفته','هفتهٔ قبل');
+  const ms=monthStart(today),dIn=jm(today).d,pEnd=addDays(ms,-1),pLen=jm(pEnd).d,pStart=addDays(pEnd,-(pLen-1)),n=Math.min(dIn,pLen);
+  cmpCard($('#cmpM'),`${jMonthName(today)} در برابر ${jMonthName(pEnd)}`,`${fa(n)} روز اول هر دو ماه`,agg(span(ms,dIn)),agg(span(pStart,n)),'این ماه','ماه قبل');
+  // trend
+  let bars=[];
+  if(trend==='w'){for(let k=7;k>=0;k--){const s0=addDays(ws,-7*k),len=k===0?nW:7,a=agg(span(s0,len));bars.push({l:k===0?'این هفته':jalShort(s0),v:a.dn,cur:k===0})}}
+  else{let m0=ms;const arr=[];for(let k=0;k<6;k++){const len=k===0?dIn:jm(addDays(nextM(m0),-1)).d;arr.unshift({s:m0,len,cur:k===0});m0=monthStart(addDays(m0,-1))}
+    bars=arr.map(o=>({l:jMonthName(o.s),v:agg(span(o.s,o.len)).dn,cur:o.cur}))}
+  let [x,w,h]=setupCanvas($('#cTrend'));const padB=26,padT=18,mx=Math.max(1,...bars.map(b=>b.v)),bw=w/bars.length;
+  x.clearRect(0,0,w,h);x.strokeStyle='#eef2f7';x.beginPath();x.moveTo(0,h-padB+.5);x.lineTo(w,h-padB+.5);x.stroke();
+  bars.forEach((b,i)=>{const X=w-(i+1)*bw+bw*.2,W=bw*.6,bh=(h-padB-padT)*b.v/mx,Y=h-padB-bh;
+    x.fillStyle=b.cur?'#2563eb':'#c7d2fe';const r=Math.min(6,W/2);
+    if(bh>0){x.beginPath();x.moveTo(X,h-padB);x.lineTo(X,Y+r);x.quadraticCurveTo(X,Y,X+r,Y);x.lineTo(X+W-r,Y);x.quadraticCurveTo(X+W,Y,X+W,Y+r);x.lineTo(X+W,h-padB);x.fill()}
+    x.fillStyle='#111827';x.textAlign='center';x.font='bold 11px Tahoma';x.fillText(fa(b.v),X+W/2,Y-5);
+    x.fillStyle='#6b7280';x.font='10px Tahoma';x.fillText(b.l,X+W/2,h-9)});
+  const last=bars[bars.length-1],prev=bars[bars.length-2];
+  $('#trendNote').textContent=trend==='w'?'عدد هر ستون = کارهای انجام‌شده در آن هفته (شروع هفته شنبه).':'عدد هر ستون = کارهای انجام‌شده در آن ماه شمسی؛ ماه جاری تا امروز.';
 }
+function nextM(m0){let d=addDays(m0,27);while(jm(d).d!==1)d=addDays(d,1);return d}
 
 /* excel */
 const statusCell=t=>t.done?{v:'انجام شد',s:3}:{v:'انجام نشد',s:4};
